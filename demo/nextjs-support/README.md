@@ -6,6 +6,8 @@ Redis Agent Memory also extracts each customer's setup into a structured record 
 
 The chat goes through `memory.model(...)` from this package. The staff query and the "what the agent knows" panel use the Agent Memory client, [`@redis-iris/agent-memory`](https://github.com/redis/iris-sdks), directly, because the wrapper is scoped to one user.
 
+To see what that one wrapper replaces, read [What you'd build without Redis Agent Memory](WITHOUT_AGENT_MEMORY.md).
+
 ## Setup
 
 You need Node.js 22 or newer, a Redis Cloud account with an [Agent Memory](https://redis.io/docs/latest/develop/ai/context-engine/agent-memory/) service, and an Anthropic API key.
@@ -78,8 +80,6 @@ These are the places teams get memory wrong in a multi-user app. Each one is a f
 6. **Show what's stored.** The panel lists the customer's memories through the Agent Memory client, filtered by the server-side owner ID ([app/api/memories/route.ts](app/api/memories/route.ts)).
 7. **Cross-customer queries are staff-only.** The Account health query ([lib/account-health.ts](lib/account-health.ts)) runs only for a separate staff session, never a customer one, and only over this run's customer IDs.
 8. **A tab can't keep acting for someone who signed out.** Tabs in one browser share the sign-in cookie, so signing in as another customer in a second tab would silently change who the first tab talks as. Each page sends the conversation it was opened for (`x-waypoint-session`). The chat and memory routes refuse a mismatch with 409, and the page asks you to reload.
-
-[diy/what-you-would-build.ts](diy/what-you-would-build.ts) sketches what you'd write without Redis Agent Memory: the event log, summaries, an extraction worker and its prompt, embeddings, a per-user vector index, deduplication, PII filtering, and prompt budgets. It's illustrative and isn't compiled.
 
 ## Memory behavior
 
