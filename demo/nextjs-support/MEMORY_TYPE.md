@@ -27,7 +27,13 @@ customer_environment
 The customer's technical setup for the Waypoint API gateway, as stated in support conversations.
 ```
 
-**Fields**
+**Extraction prompt**
+
+```text
+Extract the customer's technical setup for the Waypoint API gateway whenever the user states any of: the gateway region, where their own backend or origin servers run, the runtime or language that calls Waypoint, the Waypoint SDK version, or whether HTTP keep-alive is on or off. Fill only the fields the user actually stated. Treat "we turned keep-alive off" or "disabled keep-alive" as keep_alive_enabled = false. client_runtime is the platform or language of the services that call Waypoint, never a command-line tool such as curl. gateway_region is only the Waypoint gateway's region; where the customer's own services run belongs in client_runtime or origin_location.
+```
+
+**Custom Fields**
 
 | Field name | Type | Description |
 |------------|------|-------------|
@@ -36,12 +42,6 @@ The customer's technical setup for the Waypoint API gateway, as stated in suppor
 | `client_runtime` | `str` | What calls Waypoint, for example AWS Lambda with Node 18, or Go on Kubernetes. |
 | `sdk_version` | `str` | Waypoint SDK version the customer uses, for example 3.0 or 3.2.1. |
 | `keep_alive_enabled` | `str` | Whether HTTP keep-alive is enabled in the customer's client. |
-
-**Extraction prompt**
-
-```text
-Extract the customer's technical setup for the Waypoint API gateway whenever the user states any of: the gateway region, where their own backend or origin servers run, the runtime or language that calls Waypoint, the Waypoint SDK version, or whether HTTP keep-alive is on or off. Fill only the fields the user actually stated. Treat "we turned keep-alive off" or "disabled keep-alive" as keep_alive_enabled = false. client_runtime is the platform or language of the services that call Waypoint, never a command-line tool such as curl. gateway_region is only the Waypoint gateway's region; where the customer's own services run belongs in client_runtime or origin_location.
-```
 
 The same definitions are in [lib/environment.ts](lib/environment.ts). If you change one, change the other.
 
