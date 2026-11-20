@@ -23,8 +23,8 @@ The approaches may coexist, but do not enable automatic model recording and sess
 
 ## Installation
 
-Requires Node.js 22+, AI SDK 7.0.114+ (7.x), and Zod 4.1.8+ (4.x).
-This is a server-side, ESM-only package with TypeScript declarations.
+Requires Node.js 22.12+, AI SDK 7.0.114+ (7.x), and Zod 4.1.8+ (4.x).
+This is a server-side ESM package with TypeScript declarations. CommonJS projects can load it with `require()`.
 
 ```sh
 npm install @redis/vercel-ai-sdk
@@ -109,7 +109,10 @@ Never combine automatic recording with session hooks or model-callable session-w
 For streaming, nonterminal parts pass through as produced.
 Recording follows raw provider finish plus normal source close, and the terminal finish is held only for the bounded save.
 Cancellation or transport failure before raw completion prevents the assistant write where possible; an accepted POST cannot be rolled back.
-Memory failures are exposed through the optional content-free `onDiagnostic` callback and do not replace successful model output.
+Memory failures do not replace successful model output.
+Read failures, timeouts, failed or oversized session writes, and assistant scope violations are added to the AI SDK `warnings` as content-free `{ type: 'other' }` entries. The AI SDK logs warnings to the console unless `globalThis.AI_SDK_LOG_WARNINGS` is `false` or a custom logger.
+A streamed assistant write finishes after `stream-start` has been sent, so its failure reaches only `onDiagnostic`.
+The optional `onDiagnostic` callback receives every outcome, including successes, as a structured, content-free event.
 Scope violations remain hard failures.
 
 ## Runnable demos
@@ -171,6 +174,14 @@ Resolve scope and overrides from authenticated application state.
 During tool execution, the AI SDK `abortSignal` is forwarded to Iris.
 Session hooks use the configured HTTP timeout.
 SDK defaults disable automatic retries, avoiding duplicate appends after uncertain outcomes.
+
+### Health check
+
+Model and tool calls fail open, so a wrong URL, store ID, or API key otherwise goes unnoticed. Call `await memory.verify()` at startup or from a readiness probe.
+It requests the store's health with the configured connection and resolves with `{ status, features }`, where each status is `HEALTHY`, `DEGRADED`, or `UNAVAILABLE`.
+It rejects with a `RedisAgentMemoryToolError` when the server is unreachable or refuses the store ID or key, for example `IRIS_HTTP_401`, and does not retry.
+Pass `{ timeoutMs }` to bound the request more tightly than the factory's `timeoutMs`, for example `await memory.verify({ timeoutMs: 2_000 })`.
+Whether `DEGRADED` should fail readiness is the application's decision.
 
 ## Development
 

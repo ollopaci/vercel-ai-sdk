@@ -105,7 +105,7 @@ const configuredModel = {
 };
 const memory = createRedisAgentMemory({ ...connection, scope, model: configuredModel });
 assert(Object.isFrozen(memory));
-assert.deepEqual(Object.keys(memory), ['tools', 'model']);
+assert.deepEqual(Object.keys(memory), ['tools', 'model', 'verify']);
 const tools = memory.tools();
 for (const name of ['get_memory_context', 'add_session_event', 'get_memory', 'search_memories', 'create_memories']) {
   assert.equal(typeof tools[name]?.execute, 'function', name + ' must be executable');
@@ -133,6 +133,14 @@ console.log('Verified installed ESM unified factory construction without network
 `);
   run([join(consumer, 'runtime.mjs')]);
 
+  writeFileSync(join(consumer, 'runtime.cjs'), `
+const assert = require('node:assert/strict');
+const { createRedisAgentMemory } = require(${packageName});
+assert.equal(typeof createRedisAgentMemory, 'function');
+console.log('Verified CommonJS require() of the package root.');
+`);
+  run([join(consumer, 'runtime.cjs')]);
+
   writeFileSync(join(consumer, 'consumer.ts'), `
 import { ToolLoopAgent, isStepCount, wrapLanguageModel, type ToolSet } from 'ai';
 import {
@@ -140,6 +148,9 @@ import {
   type ConfiguredLanguageModel,
   type RedisAgentMemoryDiagnostic,
   type RedisAgentMemoryDiagnosticError,
+  type RedisAgentMemoryHealth,
+  type RedisAgentMemoryHealthStatus,
+  type RedisAgentMemoryVerifyOptions,
   type RedisAgentMemoryLimits,
   type RedisAgentMemoryModelOptions,
   type RedisAgentMemoryOptions,
@@ -180,6 +191,10 @@ const modelOptions: RedisAgentMemoryModelOptions = {
   onDiagnostic,
 };
 const memory = createRedisAgentMemory(factoryOptions);
+const verifyOptions: RedisAgentMemoryVerifyOptions = { timeoutMs: 2_000 };
+const verify: (options?: RedisAgentMemoryVerifyOptions) => Promise<RedisAgentMemoryHealth> = memory.verify;
+const healthy: RedisAgentMemoryHealthStatus = 'HEALTHY';
+void [verify, verifyOptions, healthy];
 const tools: ToolSet = memory.tools();
 const requestModel = memory.model(modelOptions);
 const overridden = memory.model({ ...modelOptions, model: otherModel });
