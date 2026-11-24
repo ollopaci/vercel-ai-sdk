@@ -14,7 +14,8 @@ export interface HealthRow {
 /**
  * The query behind the "Account health" view: structured memories extracted
  * from support conversations, filtered by a typed field, across customers.
- * Staff only. Never expose a cross-customer query to a customer session.
+ * Runs only for a staff session, never a customer one. In this demo anyone can
+ * start a staff session from the home page; gate it behind real staff auth.
  */
 export function healthFilter(view: HealthView, ownerIds: string[]): LongTermMemoryFilter {
   return {
@@ -50,5 +51,7 @@ export async function accountHealth(view: HealthView): Promise<{ rows: HealthRow
       updatedAt: (records[0]?.updatedAt ?? new Date()).toISOString(),
     };
   });
-  return { rows, filter };
+  // 3. An older record can still say "false" after the customer turned
+  //    keep-alive back on, so keep only customers whose newest value matches.
+  return { rows: view === 'all' ? rows : rows.filter(row => row.attributes.keep_alive_enabled === KEEP_ALIVE_OFF), filter };
 }

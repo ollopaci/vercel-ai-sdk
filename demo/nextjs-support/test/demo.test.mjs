@@ -196,7 +196,7 @@ test('a tab still showing an earlier conversation is refused with 409', async ()
   assert.deepEqual(requests(), []);
 });
 
-test('the panel lists only the viewer’s memories, merges the setup record, and hides notes about the assistant', async () => {
+test('the panel lists only the viewer’s memories, merges the setup record newest value first, and hides notes about the assistant', async () => {
   resetTrace();
   const cookie = await signIn('lindgren-logistics');
   const response = await fetch(`${app.base}/api/memories`, { headers: { cookie } });
@@ -204,8 +204,9 @@ test('the panel lists only the viewer’s memories, merges the setup record, and
   const { facts, hiddenAssistantNotes } = await response.json();
   assert.deepEqual(requests('memory-search').map(entry => entry.body.filter), [{ ownerId: { eq: owner('lindgren-logistics') } }]);
   const setup = facts.find(fact => fact.type === 'customer_environment');
+  // lin-env-0 says Virginia, but it's older than lin-env-2's Frankfurt.
   assert.deepEqual(setup.attributes, { gateway_region: 'us-east', origin_location: 'Frankfurt' });
-  assert.deepEqual(setup.mergedIds.sort(), ['lin-env-1', 'lin-env-2']);
+  assert.deepEqual(setup.mergedIds.sort(), ['lin-env-0', 'lin-env-1', 'lin-env-2']);
   assert.equal(hiddenAssistantNotes, 1);
   assert.doesNotMatch(JSON.stringify(facts), /keep-alive|another-app/);
 });
@@ -217,7 +218,11 @@ test('staff see every customer with keep-alive off, from a typed filter over thi
   assert.equal(response.status, 200);
   const html = await response.text();
   for (const company of ['Harbor Health', 'Brightline Media', 'Tidepool Games']) assert.match(html, new RegExp(company));
+  // Okafor has an older keep-alive-off record but turned it back on since, so it must not be listed.
   for (const company of ['Lindgren Logistics', 'Okafor Freight', 'Meridian Bank']) assert.doesNotMatch(html, new RegExp(company));
+  const [, details] = requests('memory-search');
+  assert.ok(details.body.filter.ownerId.in.includes(owner('okafor-freight')),
+    'Okafor matches the typed filter, so this covers the re-check of the newest value');
 
   const [query] = requests('memory-search');
   assert.deepEqual(query.body.filter.memoryType, { eq: 'customer_environment' });

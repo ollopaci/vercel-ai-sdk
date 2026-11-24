@@ -64,8 +64,9 @@ export async function startConversation(customer: Customer): Promise<void> {
   store.set(SESSION_COOKIE, `${payload}.${sign(payload)}`, cookieOptions());
 }
 
-// Staff access for the cross-customer "Account health" view. Separate from
-// customer sign-in: customers must never be able to run cross-customer queries.
+// Staff access for the cross-customer "Account health" view, kept separate from
+// customer sign-in so a customer session can't run cross-customer queries.
+// Demo only: anyone can start a staff session. Use real staff auth in production.
 export async function startStaffSession(): Promise<void> {
   const payload = `staff:${randomUUID()}`;
   (await cookies()).set(STAFF_COOKIE, `${payload}.${sign(payload)}`, cookieOptions());

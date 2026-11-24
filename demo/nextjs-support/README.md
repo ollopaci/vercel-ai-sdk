@@ -61,7 +61,7 @@ npm run dev
    - **Lindgren:** the origin moved to Frankfurt but the gateway is still in us-east, so traffic crosses the Atlantic twice. The fix comes as curl, because that's what their ops team uses.
    - **Harbor:** keep-alive was turned off last quarter, so every Lambda call pays a new TLS handshake. The fix is to upgrade to SDK 3.2+ and turn keep-alive back on, and the agent doesn't ask for payloads.
 2. Look at **What the agent knows about you**. The memories used in the reply are highlighted, and the setup shows as one typed `customer_environment` record.
-3. In Lindgren's window, switch **Memory on** to **Memory off** and ask again. The agent has to ask where the gateway and origin are. Memory-off turns aren't recorded.
+3. In Lindgren's window, select **New conversation**, switch **Memory on** to **Memory off**, and ask the same question. With no earlier messages and no long-term memory, the agent has to ask where the gateway and origin are. Memory-off turns aren't recorded, so select **New conversation** again before you switch memory back on.
 4. Mention a new detail in passing, such as "we're moving to SDK 3.2 next week". About a minute later it appears in the panel.
 5. Select **New conversation**. The chat is empty, but the agent still knows the customer: a new session, the same long-term memory.
 6. Select **Switch customer**, then **Waypoint staff**. **Keep-alive off** lists Harbor Health, Brightline Media and Tidepool Games, from one `searchLongTermMemory` call filtered by memory type and a typed field. **Notify** is a demo button and sends nothing.
@@ -78,7 +78,7 @@ These are the places teams get memory wrong in a multi-user app. Each one is a f
 4. **One request per conversation at a time.** Recording isn't idempotent, so overlapping requests on one session would interleave their events. [lib/memory.ts](lib/memory.ts) holds a per-session lock until the stream ends. It's in-process, which works for one server; multiple instances need a distributed lock.
 5. **Memory context is marked untrusted.** The wrapper injects recalled facts as a labeled system block, and the system prompt tells the model to treat them as reference only ([lib/product.ts](lib/product.ts)).
 6. **Show what's stored.** The panel lists the customer's memories through the Agent Memory client, filtered by the server-side owner ID ([app/api/memories/route.ts](app/api/memories/route.ts)).
-7. **Cross-customer queries are staff-only.** The Account health query ([lib/account-health.ts](lib/account-health.ts)) runs only for a separate staff session, never a customer one, and only over this run's customer IDs.
+7. **Cross-customer queries never run for a customer.** The Account health query ([lib/account-health.ts](lib/account-health.ts)) runs only for a separate staff session, and only over this run's customer IDs. In this demo anyone can start a staff session from the home page; in a real app it needs staff authorization.
 8. **A tab can't keep acting for someone who signed out.** Tabs in one browser share the sign-in cookie, so signing in as another customer in a second tab would silently change who the first tab talks as. Each page sends the conversation it was opened for (`x-waypoint-session`). The chat and memory routes refuse a mismatch with 409, and the page asks you to reload.
 
 ## Memory behavior
@@ -95,13 +95,14 @@ These are the places teams get memory wrong in a multi-user app. Each one is a f
 npm test
 ```
 
-This builds the app and runs it with `next start`, with Redis Agent Memory and Anthropic replaced by [test/fixtures/services.mjs](test/fixtures/services.mjs). No credentials are needed and no network calls are made. The tests cover each customer getting only their own memories, every search filtered by the server-side owner, identity in the request body being ignored, signed-out and forged requests being refused before any call, only the newest message being sent, memory off sending no memory context, overlapping requests being serialized, stale tabs getting 409, the panel's owner filter and merged record, the staff query's typed filter over this run's customers only, customers being kept out of the staff page, and a new `DEMO_RUN` signing out old conversations.
+This builds the app and runs it with `next start`, with Redis Agent Memory and Anthropic replaced by [test/fixtures/services.mjs](test/fixtures/services.mjs). No credentials are needed and no network calls are made. The tests cover each customer getting only their own memories, every search filtered by the server-side owner, identity in the request body being ignored, signed-out and forged requests being refused before any call, only the newest message being sent, memory off sending no memory context, overlapping requests being serialized, stale tabs getting 409, the panel's owner filter and merged record with the newest value winning, the staff query's typed filter over this run's customers only, a customer who turned keep-alive back on dropping off the staff list, customers being kept out of the staff page, and a new `DEMO_RUN` signing out old conversations.
 
 ## Production notes
 
 - Replace the demo sign-in with your auth provider. Keep the rule that scope is derived on the server.
 - Replace the in-process session lock with a distributed one (for example Redis `SET NX` with a TTL) if you run more than one instance.
-- Gate the cross-customer query behind real staff authorization. A customer later turning keep-alive back on may leave an older record that still matches the filter; check how extraction updates records before relying on the query for outreach.
+- Gate the cross-customer query behind real staff authorization.
+- A customer who turns keep-alive back on can leave an older record that still says `"false"`. The staff view re-checks each matching customer's newest value, so they drop off the list. It loads up to 100 records per query; page through results for more customers.
 - Recording sends user and assistant text to Redis Agent Memory. Configure retention and sensitive-data exclusions on the service to match your policy.
 
 The local dependency is `file:../..`, resolving to the repository-root library. [.npmrc](.npmrc) sets `install-links=true`, so npm installs it as a packed copy, the way an app gets it from npm: the library then uses this app's `ai` and `zod` instead of the root's development copies. After library edits, run `npm run build` at the root, then `npm ci` here.

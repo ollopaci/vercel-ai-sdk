@@ -113,6 +113,10 @@ async function checkDemoReady(): Promise<boolean> {
   const setup = (id: string) => rows.find(row => row.customer.id === id)?.attributes ?? {};
   const harbor = setup('harbor-health');
   const lindgren = setup('lindgren-logistics');
+  // Every customer except Lindgren describes the services that call Waypoint.
+  const noRuntime = rows.filter(row => row.customer.id !== 'lindgren-logistics' && !row.attributes.client_runtime).map(row => row.customer.id);
+  // Only Lindgren talks about the Waypoint gateway itself.
+  const strayGateway = rows.filter(row => row.customer.id !== 'lindgren-logistics' && row.attributes.gateway_region).map(row => row.customer.id);
   const keepAliveOff = (await accountHealth('keep-alive-off')).rows.map(row => row.customer.id).sort();
   const expectedOff = ['brightline-media', 'harbor-health', 'tidepool-games'];
 
@@ -120,9 +124,12 @@ async function checkDemoReady(): Promise<boolean> {
     ['Harbor: keep-alive is "false"', harbor.keep_alive_enabled === KEEP_ALIVE_OFF],
     ['Harbor: SDK is 3.0', harbor.sdk_version === '3.0'],
     ['Harbor: runtime mentions Lambda', /lambda/i.test(String(harbor.client_runtime ?? ''))],
+    ['Harbor: origin is us-east', /us-east/i.test(String(harbor.origin_location ?? ''))],
     ['Lindgren: gateway is us-east', lindgren.gateway_region === 'us-east'],
     ['Lindgren: origin is Frankfurt', /frankfurt/i.test(String(lindgren.origin_location ?? ''))],
     ['Lindgren: runtime is not curl', !/curl/i.test(String(lindgren.client_runtime ?? ''))],
+    [`Every other customer has a runtime (missing: ${noRuntime.join(', ') || 'none'})`, noRuntime.length === 0],
+    [`Only Lindgren has a gateway region (also: ${strayGateway.join(', ') || 'none'})`, strayGateway.length === 0],
     [`Staff "Keep-alive off" view lists exactly Brightline, Harbor, Tidepool (got: ${keepAliveOff.join(', ') || 'none'})`,
       JSON.stringify(keepAliveOff) === JSON.stringify(expectedOff)],
   ];

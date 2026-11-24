@@ -30,7 +30,12 @@ The customer's technical setup for the Waypoint API gateway, as stated in suppor
 **Extraction prompt**
 
 ```text
-Extract the customer's technical setup for the Waypoint API gateway whenever the user states any of: the gateway region, where their own backend or origin servers run, the runtime or language that calls Waypoint, the Waypoint SDK version, or whether HTTP keep-alive is on or off. Fill only the fields the user actually stated. Treat "we turned keep-alive off" or "disabled keep-alive" as keep_alive_enabled = false. client_runtime is the platform or language of the services that call Waypoint, never a command-line tool such as curl. gateway_region is only the Waypoint gateway's region; where the customer's own services run belongs in client_runtime or origin_location.
+Extract the customer's technical setup for the Waypoint API gateway whenever the user states part of it. Fill only what the user actually said, and put each detail in exactly one field:
+- gateway_region: the region of the Waypoint gateway itself, only when the user talks about the gateway. Never the region where the customer's own services run.
+- origin_location: the region or city where the customer's own services run, whether that's their backend or the services that call Waypoint. For "Lambda functions in us-east", that's us-east.
+- client_runtime: the platform and language of the services that call Waypoint, without the region, for example "AWS Lambda with Node 18" or "Java services". Never a command-line tool such as curl.
+- sdk_version: the Waypoint SDK version number only, for example 3.2.1.
+- keep_alive_enabled: "true" or "false". "We turned keep-alive off" or "disabled keep-alive" means "false".
 ```
 
 **Custom Fields**
@@ -47,9 +52,11 @@ The same definitions are in [lib/environment.ts](lib/environment.ts). If you cha
 
 **Why `keep_alive_enabled` is text, not `bool`:** the demo service has it as `str`, and field types can't change after creation, so the app matches the text value `"false"`. With this prompt, extraction writes `"true"` or `"false"`. Attribute filters are exact and case-sensitive, so `"False"` or `"off"` wouldn't match. If you see other values, edit the extraction prompt (it stays editable) and re-seed under a new `DEMO_RUN`.
 
-## Why the prompt names the wrong fields
+## Why the prompt gives each detail one field
 
-Without the last two sentences, extraction tended to file a customer's command-line tool as their runtime ("curl"), and where their own services run as the gateway region. The prompt stays editable after creation. If you change it, re-seed under a new `DEMO_RUN`, because existing records aren't re-extracted.
+Several fields could hold the same detail. "Our Lambda functions in us-east" could be a runtime, an origin or a gateway region, and with a looser prompt extraction picked differently from run to run: it filed a command-line tool as a runtime ("curl"), put a customer's own region in the gateway field, or folded it into the runtime and left the origin empty. Rules that give each detail exactly one field keep runs consistent.
+
+The prompt stays editable after creation. If you change it, re-seed under a new `DEMO_RUN`, because existing records aren't re-extracted.
 
 ## Check it worked
 
@@ -57,7 +64,7 @@ Run `npm run seed`. For each customer it prints the memories it found, including
 
 ```text
 Harbor Health: 4 memories
-  • [customer_environment] … {"client_runtime":"AWS Lambda in us-east with Node 18","sdk_version":"3.0","keep_alive_enabled":"false"}
+  • [customer_environment] … {"client_runtime":"AWS Lambda with Node 18","origin_location":"us-east","sdk_version":"3.0","keep_alive_enabled":"false"}
 ```
 
 It then checks the values the demo relies on and ends with **Ready to demo** or **Not ready**. If a customer gets no `customer_environment` line within 8 minutes, the script says so. Check that the type is enabled and the extraction cadence is short, then change `DEMO_RUN` and seed again.

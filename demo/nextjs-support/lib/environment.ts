@@ -23,7 +23,12 @@ export const environmentFields: EnvironmentField[] = [
   { key: 'keep_alive_enabled', label: 'Keep-alive', type: 'flag', description: 'Whether HTTP keep-alive is enabled in the customer\'s client.' },
 ];
 
-export const environmentExtractionPrompt = `Extract the customer's technical setup for the Waypoint API gateway whenever the user states any of: the gateway region, where their own backend or origin servers run, the runtime or language that calls Waypoint, the Waypoint SDK version, or whether HTTP keep-alive is on or off. Fill only the fields the user actually stated. Treat "we turned keep-alive off" or "disabled keep-alive" as keep_alive_enabled = false. client_runtime is the platform or language of the services that call Waypoint, never a command-line tool such as curl. gateway_region is only the Waypoint gateway's region; where the customer's own services run belongs in client_runtime or origin_location.`;
+export const environmentExtractionPrompt = `Extract the customer's technical setup for the Waypoint API gateway whenever the user states part of it. Fill only what the user actually said, and put each detail in exactly one field:
+- gateway_region: the region of the Waypoint gateway itself, only when the user talks about the gateway. Never the region where the customer's own services run.
+- origin_location: the region or city where the customer's own services run, whether that's their backend or the services that call Waypoint. For "Lambda functions in us-east", that's us-east.
+- client_runtime: the platform and language of the services that call Waypoint, without the region, for example "AWS Lambda with Node 18" or "Java services". Never a command-line tool such as curl.
+- sdk_version: the Waypoint SDK version number only, for example 3.2.1.
+- keep_alive_enabled: "true" or "false". "We turned keep-alive off" or "disabled keep-alive" means "false".`;
 
 /**
  * The exact stored value the staff query matches. Attribute filters are exact
@@ -41,8 +46,6 @@ export function mergeEnvironment(records: { attributes?: Record<string, unknown>
   }
   return merged;
 }
-
-export type EnvironmentAttributes = Partial<Record<string, string | boolean>>;
 
 export function formatAttribute(field: EnvironmentField, value: unknown): string | undefined {
   if (value === undefined || value === null || value === '') return undefined;

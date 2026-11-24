@@ -7,19 +7,23 @@ import { appendFileSync } from 'node:fs';
 const run = process.env.DEMO_RUN;
 const owner = id => `${id}-${run}`;
 const at = '2026-10-07T12:00:00.000Z';
+const earlier = '2026-07-01T12:00:00.000Z';
 const memory = (ownerId, memoryId, text, extra = {}) => ({
   memoryId, ownerId, text, memoryType: 'semantic', topics: [], createdAt: at, updatedAt: at, ...extra,
 });
-const environment = (ownerId, memoryId, text, attributes) =>
-  memory(ownerId, memoryId, text, { memoryType: 'customer_environment', attributes });
+const environment = (ownerId, memoryId, text, attributes, updatedAt = at) =>
+  memory(ownerId, memoryId, text, { memoryType: 'customer_environment', attributes, createdAt: updatedAt, updatedAt });
 
 // Long-term memories as extraction would have left them after `npm run seed`.
+// The older records come first, so a query that ignores sortBy gets the stale value.
 const memories = [
+  environment(owner('lindgren-logistics'), 'lin-env-0', 'The origin servers run in Virginia.', { origin_location: 'Virginia' }, earlier),
+  environment(owner('okafor-freight'), 'oka-env-0', 'Keep-alive was turned off during the reset incident.', { keep_alive_enabled: 'false' }, earlier),
   environment(owner('lindgren-logistics'), 'lin-env-1', 'The gateway runs in us-east.', { gateway_region: 'us-east' }),
   environment(owner('lindgren-logistics'), 'lin-env-2', 'The origin servers moved to Frankfurt in October.', { origin_location: 'Frankfurt' }),
   memory(owner('lindgren-logistics'), 'lin-1', 'The operations team works from curl.'),
   memory(owner('lindgren-logistics'), 'lin-2', 'Assistant recommended adding a eu-central region.'),
-  environment(owner('harbor-health'), 'har-env-1', 'Calls come from AWS Lambda with Node 18.', { client_runtime: 'AWS Lambda with Node 18' }),
+  environment(owner('harbor-health'), 'har-env-1', 'Calls come from AWS Lambda in us-east with Node 18.', { client_runtime: 'AWS Lambda with Node 18', origin_location: 'us-east' }),
   environment(owner('harbor-health'), 'har-env-2', 'The client has HTTP keep-alive turned off.', { keep_alive_enabled: 'false', sdk_version: '3.0' }),
   memory(owner('harbor-health'), 'har-1', 'Never ask for request payloads.'),
   environment(owner('brightline-media'), 'bri-env-1', 'Go on Kubernetes, keep-alive off.', { client_runtime: 'Go on Kubernetes', keep_alive_enabled: 'false' }),
@@ -107,7 +111,12 @@ globalThis.fetch = async (input, init) => {
     if (request.method === 'POST' && path === '/memories/search') {
       record({ kind: 'memory-search', ...entry });
       const limit = body.limit ?? 10;
-      return Response.json({ items: memories.filter(item => matches(item, body.filter)).slice(0, limit) });
+      const found = memories.filter(item => matches(item, body.filter));
+      if (body.sortBy === 'updatedAt') {
+        const direction = body.sortOrder === 'ASC' ? 1 : -1;
+        found.sort((a, b) => direction * a.updatedAt.localeCompare(b.updatedAt));
+      }
+      return Response.json({ items: found.slice(0, limit) });
     }
   }
 

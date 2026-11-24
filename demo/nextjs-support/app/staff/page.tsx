@@ -24,12 +24,15 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   }
 
   // Show the filter as sent: one line per condition, owner list shortened.
+  const show = (value: unknown): string => value !== null && typeof value === 'object'
+    ? `{ ${Object.entries(value).map(([key, inner]) => `${key}: ${show(inner)}`).join(', ')} }`
+    : JSON.stringify(value);
   const queryText = result && [
     'agentMemory.searchLongTermMemory({',
     '  filter: {',
     ...Object.entries(result.filter).map(([key, value]) => key === 'ownerId'
       ? `    ownerId: { in: [/* ${result!.filter.ownerId?.in?.length ?? 0} customers */] },`
-      : `    ${key}: ${JSON.stringify(value).replace(/"([a-z_A-Z]+)":/g, '$1: ').replace(/[{]/g, '{ ').replace(/[}]/g, ' }').replace(/,/g, ', ')},`),
+      : `    ${key}: ${show(value)},`),
     '  },',
     '})',
   ].join('\n');
